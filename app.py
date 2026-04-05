@@ -17,7 +17,6 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 app = Flask(__name__)
 
-# ─── Clients ────────────────────────────────────────────────────────────────
 
 reddit = praw.Reddit(
     client_id=os.environ["REDDIT_CLIENT_ID"],
@@ -28,7 +27,6 @@ reddit = praw.Reddit(
 
 analyzer = SentimentIntensityAnalyzer()
 
-# ─── Helpers ────────────────────────────────────────────────────────────────
 
 def clean_text(text: str) -> str:
     text = str(text or "")
@@ -103,9 +101,8 @@ def build_df_from_rows(rows):
     ).str.strip()
     return df
 
-# ─── Data Collection ─────────────────────────────────────────────────────────
 
-def search_reddit(query: str, *, limit=100) -> pd.DataFrame:
+def search_reddit(query: str, *, limit=500) -> pd.DataFrame:
     rows = []
     for post in reddit.subreddit("all").search(
         query, sort="relevance", time_filter="month", limit=limit
@@ -130,8 +127,8 @@ def search_reddit(query: str, *, limit=100) -> pd.DataFrame:
         ).str.strip()
     return df
 
-async def search_reddit_async(query):
-    return await asyncio.to_thread(search_reddit, query)
+async def search_reddit_async(query, limit=500):
+    return await asyncio.to_thread(search_reddit, query, limit=limit)
 
 POPJUSTICE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -182,10 +179,10 @@ async def scrape_popjustice(session, artist_name, max_results=50):
         print(f"Popjustice scrape failed: {repr(e)}")
     return build_df_from_rows(rows)
 
-async def collect_mentions_async(artist_name, reddit_query):
+async def collect_mentions_async(artist_name, reddit_query, limit=500):
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(
-            search_reddit_async(reddit_query),
+            search_reddit_async(reddit_query, limit=limit),
             scrape_popjustice(session, artist_name),
             return_exceptions=True,
         )
@@ -247,11 +244,10 @@ def map_artist():
     reddit_query = f"{artist} {context}".strip()
 
     try:
-        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query))
+        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=500))
     except RuntimeError:
-        # Already inside an event loop (e.g. some WSGI setups)
         loop = asyncio.new_event_loop()
-        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query))
+        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=500))
         loop.close()
 
     all_dfs = []
