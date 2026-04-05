@@ -17,6 +17,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 app = Flask(__name__)
 
+# ─── Clients ────────────────────────────────────────────────────────────────
 
 reddit = praw.Reddit(
     client_id=os.environ["REDDIT_CLIENT_ID"],
@@ -27,6 +28,7 @@ reddit = praw.Reddit(
 
 analyzer = SentimentIntensityAnalyzer()
 
+# ─── Helpers ────────────────────────────────────────────────────────────────
 
 def clean_text(text: str) -> str:
     text = str(text or "")
@@ -101,6 +103,7 @@ def build_df_from_rows(rows):
     ).str.strip()
     return df
 
+# ─── Data Collection ─────────────────────────────────────────────────────────
 
 def search_reddit(query: str, *, limit=500) -> pd.DataFrame:
     rows = []
@@ -127,8 +130,15 @@ def search_reddit(query: str, *, limit=500) -> pd.DataFrame:
         ).str.strip()
     return df
 
-async def search_reddit_async(query, limit=500):
-    return await asyncio.to_thread(search_reddit, query, limit=limit)
+async def search_reddit_async(query, limit=500, timeout=4.5):
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(search_reddit, query, limit=limit),
+            timeout=timeout
+        )
+    except asyncio.TimeoutError:
+        print(f"Reddit fetch timed out after {timeout}s — returning partial results")
+        return pd.DataFrame()
 
 POPJUSTICE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
