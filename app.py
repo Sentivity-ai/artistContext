@@ -134,7 +134,7 @@ def search_reddit(query: str, *, limit=500, deadline: float = None) -> pd.DataFr
         ).str.strip()
     return df
 
-async def search_reddit_async(query, limit=500, timeout=5.0):
+async def search_reddit_async(query, limit=500, timeout=4.0):
     import time
     deadline = time.time() + timeout
     return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
@@ -250,6 +250,53 @@ def map_artist():
     if not artist:
         return jsonify({"error": "Missing required field: artist"}), 400
 
+    reddit_query = f"{artist} {context}".strip()
+
+    try:
+        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=500))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=500))
+        loop.close()
+
+    all_dfs = []
+    for source_name, df in source_dfs.items():
+        if df is not None and not df.empty:
+            df = df.copy()
+            df["company"] = artist
+            df["source"] = source_name
+            if "full_text" not in df.columns:
+                df["full_text"] = (
+                    df["title"].fillna("") + "\n" +
+                    df["selftext"].fillna("") + "\n" +
+                    df["comments_text"].fillna("")
+                ).str.strip()
+            all_dfs.append(df)
+
+    if not all_dfs:
+        return jsonify({
+            "artist": artist,
+            "mention_count": 0,
+            "weekly_mentions": [0.0, 0.0, 0.0, 0.0, 0.0],
+        })
+
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    mention_count, weekly_mentions = compute_weekly_mentions(combined_df, artist)
+
+    return jsonify({
+        "artist": artist,
+        "mention_count": mention_count,
+        "weekly_mentions": weekly_mentions,
+    })
+
+
+@app.route("/map/<artist_name>", methods=["GET"])
+@app.route("/map/<artist_name>/<context>", methods=["GET"])
+def map_artist_get(artist_name, context="songs"):
+    from flask import request as flask_request
+    # Reuse the same logic by faking a POST body
+    flask_request.environ["REQUEST_METHOD"] = "GET"
+    artist = artist_name.strip()
     reddit_query = f"{artist} {context}".strip()
 
     try:
