@@ -105,11 +105,15 @@ def build_df_from_rows(rows):
 
 # ─── Data Collection ─────────────────────────────────────────────────────────
 
-def search_reddit(query: str, *, limit=500) -> pd.DataFrame:
+def search_reddit(query: str, *, limit=500, deadline: float = None) -> pd.DataFrame:
+    import time
     rows = []
     for post in reddit.subreddit("all").search(
         query, sort="relevance", time_filter="month", limit=limit
     ):
+        if deadline and time.time() > deadline:
+            print(f"Reddit deadline reached — returning {len(rows)} partial results")
+            break
         rows.append({
             "id": post.id,
             "title": clean_text(post.title),
@@ -130,15 +134,10 @@ def search_reddit(query: str, *, limit=500) -> pd.DataFrame:
         ).str.strip()
     return df
 
-async def search_reddit_async(query, limit=500, timeout=4.5):
-    try:
-        return await asyncio.wait_for(
-            asyncio.to_thread(search_reddit, query, limit=limit),
-            timeout=timeout
-        )
-    except asyncio.TimeoutError:
-        print(f"Reddit fetch timed out after {timeout}s — returning partial results")
-        return pd.DataFrame()
+async def search_reddit_async(query, limit=500, timeout=4.0):
+    import time
+    deadline = time.time() + timeout
+    return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
 
 POPJUSTICE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
