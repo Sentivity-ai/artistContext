@@ -134,7 +134,7 @@ def search_reddit(query: str, *, limit=500, deadline: float = None) -> pd.DataFr
         ).str.strip()
     return df
 
-async def search_reddit_async(query, limit=500, timeout=4.0):
+async def search_reddit_async(query, limit=500, timeout=9.0):
     import time
     deadline = time.time() + timeout
     return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
