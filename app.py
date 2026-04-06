@@ -105,7 +105,7 @@ def build_df_from_rows(rows):
 
 # ─── Data Collection ─────────────────────────────────────────────────────────
 
-def search_reddit(query: str, *, limit=500, deadline: float = None) -> pd.DataFrame:
+def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
     import time
     rows = []
     for post in reddit.subreddit("all").search(
@@ -134,7 +134,7 @@ def search_reddit(query: str, *, limit=500, deadline: float = None) -> pd.DataFr
         ).str.strip()
     return df
 
-async def search_reddit_async(query, limit=500, timeout=9.0):
+async def search_reddit_async(query, limit=None, timeout=9.0):
     import time
     deadline = time.time() + timeout
     return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
@@ -188,7 +188,7 @@ async def scrape_popjustice(session, artist_name, max_results=50):
         print(f"Popjustice scrape failed: {repr(e)}")
     return build_df_from_rows(rows)
 
-async def collect_mentions_async(artist_name, reddit_query, limit=500):
+async def collect_mentions_async(artist_name, reddit_query, limit=None):
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(
             search_reddit_async(reddit_query, limit=limit),
@@ -253,10 +253,10 @@ def map_artist():
     reddit_query = f"{artist} {context}".strip()
 
     try:
-        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=500))
+        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=None))
     except RuntimeError:
         loop = asyncio.new_event_loop()
-        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=500))
+        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=None))
         loop.close()
 
     all_dfs = []
@@ -300,10 +300,10 @@ def map_artist_get(artist_name, context="songs"):
     reddit_query = f"{artist} {context}".strip()
 
     try:
-        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=500))
+        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=None))
     except RuntimeError:
         loop = asyncio.new_event_loop()
-        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=500))
+        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=None))
         loop.close()
 
     all_dfs = []
