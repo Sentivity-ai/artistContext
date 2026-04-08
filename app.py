@@ -125,7 +125,7 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
     # "Hot" is more reliable for general discovery than "Relevance"
     try:
         search_iterator = reddit.subreddit("all").search(
-            query, sort="hot", time_filter="month", limit=limit
+            query, sort="relevance", time_filter="month", limit=limit
         )
         
         for post in search_iterator:
