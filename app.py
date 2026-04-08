@@ -390,7 +390,7 @@ def map_artist_get(artist_name, context="songs"):
         return jsonify({
             "artist": artist,
             "mention_count": 0,
-            "weekly_mentions": [0.0, 0.0, 0.0, 0.0, 0.0],
+            #"weekly_mentions": [0.0, 0.0, 0.0, 0.0, 0.0],
         })
 
     combined_df = pd.concat(all_dfs, ignore_index=True)
