@@ -117,164 +117,77 @@ def get_similar_subreddit(artist_name: str) -> Optional[str]:
 
 # ─── Data Collection ─────────────────────────────────────────────────────────
 
-# def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
-
-#     import time
-
-#     rows = []
-
-#     for post in reddit.subreddit("all").search(
-
-#         query, sort="hot", time_filter="month", limit=limit
-
-#     ):
-
-#         if deadline and time.time() > deadline:
-
-#             print(f"Reddit deadline reached — returning {len(rows)} partial results")
-
-#             break
-
-#         rows.append({
-
-#             "id": post.id,
-
-#             "title": clean_text(post.title),
-
-#             "selftext": clean_text(post.selftext),
-
-#             "score": post.score,
-
-#             "num_comments": post.num_comments,
-
-#             "subreddit": str(post.subreddit),
-
-#             "created_utc": post.created_utc,
-
-#             "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
-
-#             "url": post.url,
-
-#             "permalink": f"https://www.reddit.com{post.permalink}",
-
-#             "comments_text": "",
-
-#         })
-
-#     df = pd.DataFrame(rows)
-
-#     if not df.empty:
-
-#         df["full_text"] = (
-
-#             df["title"] + "\n" + df["selftext"] + "\n" + df["comments_text"]
-
-#         ).str.strip()
-
-#     return df
-
-#     # Final Data Processing
-#     df = pd.DataFrame(rows)
-    
-#     if not df.empty:
-#         # 1. Deduplicate (crucial when doing multiple searches)
-#         df = df.drop_duplicates(subset=["id"])
-        
-#         # 2. Re-create the full_text column for sentiment/analysis
-#         df["full_text"] = (
-#             df["title"].fillna("") + "\n" + 
-#             df["selftext"].fillna("") + "\n" + 
-#             df["comments_text"].fillna("")
-#         ).str.strip()
-        
-#     return df
-# async def search_reddit_async(query, limit=None, timeout=9.0):
-#     import time
-#     deadline = time.time() + timeout
-#     return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
+# ─── Data Collection ─────────────────────────────────────────────────────────
 
 
-def search_reddit(query: str, artist_name: str = "", *, limit=None, deadline: float = None) -> pd.DataFrame:
+
+def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
+
     import time
+
     rows = []
-    num_weeks = 5
-    seconds_in_week = 7 * 24 * 60 * 60
-    now = int(time.time())
 
-    # Find the fan-hub subreddit (Similarity Search)
-    target_sub = get_similar_subreddit(artist_name) if artist_name else None
-    
-    # We will search both "all" and the specific subreddit if found
-    search_locations = ["all"]
-    if target_sub and target_sub.lower() != "all":
-        search_locations.append(target_sub)
-        print(f"Targeting specific community: r/{target_sub}")
+    for post in reddit.subreddit("all").search(
 
-    for location in search_locations:
-        for i in range(num_weeks):
-            if deadline and time.time() > deadline:
-                break
+        query, sort="hot", time_filter="month", limit=limit
 
-            start_ts = now - (seconds_in_week * (i + 1))
-            end_ts = now - (seconds_in_week * i)
-            
-            # Search logic
-            time_query = f"{query} timestamp:{start_ts}..{end_ts}"
-            try:
-                # Querying the specific location (r/all or r/artistname)
-                results = reddit.subreddit(location).search(
-                    time_query, 
-                    sort="top", 
-                    syntax="cloudsearch", 
-                    time_filter="all", 
-                    limit=limit
-                )
+    ):
 
-                for post in results:
-                    if deadline and time.time() > deadline:
-                        break
-                    
-                    rows.append({
-                        "id": post.id,
-                        "title": clean_text(post.title),
-                        "selftext": clean_text(post.selftext),
-                        "score": post.score,
-                        "num_comments": post.num_comments,
-                        "subreddit": str(post.subreddit),
-                        "created_utc": post.created_utc,
-                        "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
-                        "url": post.url,
-                        "permalink": f"https://www.reddit.com{post.permalink}",
-                        "comments_text": "",
-                    })
-            except Exception as e:
-                print(f"Error in r/{location} week {i}: {e}")
-                continue
+        if deadline and time.time() > deadline:
 
-    # Build and Deduplicate
+            print(f"Reddit deadline reached — returning {len(rows)} partial results")
+
+            break
+
+        rows.append({
+
+            "id": post.id,
+
+            "title": clean_text(post.title),
+
+            "selftext": clean_text(post.selftext),
+
+            "score": post.score,
+
+            "num_comments": post.num_comments,
+
+            "subreddit": str(post.subreddit),
+
+            "created_utc": post.created_utc,
+
+            "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
+
+            "url": post.url,
+
+            "permalink": f"https://www.reddit.com{post.permalink}",
+
+            "comments_text": "",
+
+        })
+
     df = pd.DataFrame(rows)
+
     if not df.empty:
-        # Crucial: removing duplicates since r/all and r/artistname overlap
-        df = df.drop_duplicates(subset=["id"])
+
         df["full_text"] = (
-            df["title"].fillna("") + "\n" + 
-            df["selftext"].fillna("") + "\n" + 
-            df["comments_text"].fillna("")
+
+            df["title"] + "\n" + df["selftext"] + "\n" + df["comments_text"]
+
         ).str.strip()
-        
+
     return df
 
-# In search_reddit_async
-async def search_reddit_async(query, artist_name, limit=None, timeout=9.0):
-    deadline = time.time() + timeout
-    return await asyncio.to_thread(search_reddit, query, artist_name, limit=limit, deadline=deadline)
 
-# In collect_mentions_async
-results = await asyncio.gather(
-    search_reddit_async(reddit_query, artist_name, limit=limit), # Added artist_name
-    scrape_popjustice(session, artist_name),
-    return_exceptions=True,
-)
+
+async def search_reddit_async(query, limit=None, timeout=9.0):
+
+    import time
+
+    deadline = time.time() + timeout
+
+    return await asyncio.to_thread(search_reddit, query, limit=limit, deadline=deadline)
+
+
 
 POPJUSTICE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
