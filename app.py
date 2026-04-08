@@ -165,7 +165,7 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     # We removed the complex boolean logic and quotes to make the search "fuzzier"
     # This ensures Reddit actually finds matches even if phrasing is slightly off
     contexts = [
-        "Tours", "Fan club", "Songs", "Sold out", "Albums",
+        "",
     ]
     
     # Create tasks: search for [Artist Name Context]
