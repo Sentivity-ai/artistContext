@@ -122,8 +122,8 @@ def get_similar_subreddit(artist_name: str) -> Optional[str]:
 def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
     import time
     rows = []
-    # We use sort="relevance" here as it is significantly more effective 
-    # for specific context matching than "hot".
+    # We use sort="relevance" because "hot" often misses specific terms like "setlist" 
+    # or "merch" if they aren't trending at this exact second.
     for post in reddit.subreddit("all").search(
         query, sort="relevance", time_filter="month", limit=limit
     ):
@@ -143,35 +143,28 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
             "permalink": f"https://www.reddit.com{post.permalink}",
             "comments_text": "",
         })
+    
     df = pd.DataFrame(rows)
     if not df.empty:
         df["full_text"] = (
-            df["title"] + "\n" + df["selftext"] + "\n" + df["comments_text"]
+            df["title"].fillna("") + "\n" + 
+            df["selftext"].fillna("") + "\n" + 
+            df["comments_text"].fillna("")
         ).str.strip()
     return df
 
-async def search_reddit_async(artist_name, limit=None, timeout=12.0):
+async def search_reddit_async(artist_name, limit=None, timeout=9.0):
     import time
     deadline = time.time() + timeout
     
-    # Client's ordered context list mapped to optimized search terms
+    # Client's specific context order formulated for PRAW relevance
     contexts = [
-        '(tour OR tours OR "live dates" OR "concert tour")',          # Tours
-        '("fan club" OR fanclub OR "presale code")',                  # Fan club
-        '(song OR songs OR track OR tracks OR "new single")',         # Songs
-        '("sold out" OR "resale" OR "tickets gone")',                 # Sold out
-        '(album OR albums OR LP OR EP OR "new record")',              # Albums
-        '(setlist OR "set list" OR "played tonight")',                # Setlist
-        '(merch OR merchandise OR "vinyl" OR "shirt")',               # Merch
-        '(festival OR fest OR lineup OR "stage time")',               # Festival
-        '("meet and greet" OR "VIP" OR "m&g")',                       # Meet and greet
-        '(encore OR "final song" OR "last song")',                    # Encore
-        '("pre-save" OR presave OR "pre-order")',                     # Pre-save
-        '("outfit" OR "wear to" OR "clothes")',                       # Outfit planning
-        '(radio OR airplay OR "request" OR "stations")'               # Radio
+        "Tours", "Fan club", "Songs", "Sold out", "Albums", 
+        "Setlist", "Merch", "Festival", "Meet and greet", 
+        "Encore", "Pre-save", "Outfit planning", "Radio"
     ]
-
-    # Create tasks for all 13 queries simultaneously
+    
+    # Create individual search tasks for each context
     tasks = [
         asyncio.to_thread(
             search_reddit, f'"{artist_name}" {ctx}', limit=limit, deadline=deadline
@@ -179,14 +172,22 @@ async def search_reddit_async(artist_name, limit=None, timeout=12.0):
         for ctx in contexts
     ]
     
-    # Gather results from all parallel searches
+    # Run all 13 searches in parallel
     results = await asyncio.gather(*tasks)
     
-    # Combine, deduplicate, and return
-    combined_df = pd.concat(results, ignore_index=True)
-    if not combined_df.empty:
-        combined_df = combined_df.drop_duplicates(subset=["id"])
-        
+    # Filter out empty DataFrames to avoid concat errors
+    valid_results = [res for res in results if not res.empty]
+    
+    if not valid_results:
+        # Return an empty DF with correct columns if nothing is found
+        return pd.DataFrame(columns=[
+            "id", "title", "selftext", "score", "num_comments", "subreddit",
+            "created_utc", "created_dt", "url", "permalink", "comments_text", "full_text"
+        ])
+    
+    # Combine and deduplicate (same post might match multiple contexts)
+    combined_df = pd.concat(valid_results, ignore_index=True).drop_duplicates(subset=["id"])
+    
     return combined_df
 
 
