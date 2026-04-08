@@ -109,7 +109,7 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
     import time
     rows = []
     for post in reddit.subreddit("all").search(
-        query, sort="relevance", time_filter="all", limit=limit
+        query, sort="relevance", time_filter="week", limit=limit
     ):
         if deadline and time.time() > deadline:
             print(f"Reddit deadline reached — returning {len(rows)} partial results")
