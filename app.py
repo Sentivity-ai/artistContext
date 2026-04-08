@@ -353,7 +353,7 @@ def map_artist():
 
     return jsonify({
         "artist": artist,
-        "mention_count": mention_count,
+        "mention_count": weekly_mentions[4],
         "weekly_mentions": weekly_mentions,
     })
 
@@ -400,7 +400,7 @@ def map_artist_get(artist_name, context="songs"):
 
     return jsonify({
         "artist": artist,
-        "mention_count": mention_count,
+        "mention_count": weekly_mentions[4],
         #"weekly_mentions": weekly_mentions,
     })
 
