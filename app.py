@@ -127,7 +127,7 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
         # the timestamp filter handles the timing manually.
         search_results = reddit.subreddit("all").search(
             time_query, 
-            sort="relevance", 
+            sort="hot", 
             syntax="cloudsearch", 
             time_filter="all",
             limit=limit
