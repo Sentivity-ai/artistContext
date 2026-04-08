@@ -188,18 +188,18 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     combined_df = pd.concat(valid_dfs, ignore_index=True)
     combined_df = combined_df.drop_duplicates(subset=["id"])
 
-    # ─── New Filtering Logic ───
-    # Split "Luke Combs" into ["Luke", "Combs"]
-    name_parts = artist_name.lower().split()
+    # # ─── New Filtering Logic ───
+    # # Split "Luke Combs" into ["Luke", "Combs"]
+    # name_parts = artist_name.lower().split()
     
-    def contains_artist(text):
-        if not text: return False
-        text_lower = text.lower()
-        # Returns True if any part of the name (Luke OR Combs) exists in the text
-        return any(part in text_lower for part in name_parts)
+    # def contains_artist(text):
+    #     if not text: return False
+    #     text_lower = text.lower()
+    #     # Returns True if any part of the name (Luke OR Combs) exists in the text
+    #     return any(part in text_lower for part in name_parts)
 
-    # Apply the filter to ensure relevance
-    combined_df = combined_df[combined_df["full_text"].apply(contains_artist)].copy()
+    # # Apply the filter to ensure relevance
+    # combined_df = combined_df[combined_df["full_text"].apply(contains_artist)].copy()
     
     return combined_df
 
