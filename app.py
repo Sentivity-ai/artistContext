@@ -201,7 +201,7 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
         return any(part in text_lower for part in name_parts)
 
     # Apply the filter to ensure relevance
-    combined_df = combined_df[combined_df["full_text"].a
+    combined_df = combined_df[combined_df["full_text"].apply(contains_artist)].copy()
     
     return combined_df
 
