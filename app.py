@@ -126,10 +126,10 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
         # We use syntax="cloudsearch" and time_filter="all" because 
         # the timestamp filter handles the timing manually.
         search_results = reddit.subreddit("all").search(
-            time_query, 
-            sort="hot", 
+            hist_query, 
+            sort="top", # Use 'top' or 'relevance' for historical data
             syntax="cloudsearch", 
-            time_filter="all",
+            time_filter="all", 
             limit=limit
         )
 
