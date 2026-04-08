@@ -106,57 +106,60 @@ def build_df_from_rows(rows):
 # ─── Data Collection ─────────────────────────────────────────────────────────
 
 def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
-    import time
-    rows = []
-    
-    num_weeks = 5
-    seconds_in_week = 7 * 24 * 60 * 60
-    now = int(time.time())
 
-    for i in range(num_weeks):
-        # Stop everything if we are out of time
+    import time
+
+    rows = []
+
+    for post in reddit.subreddit("all").search(
+
+        query, sort="hot", time_filter="month", limit=limit
+
+    ):
+
         if deadline and time.time() > deadline:
+
+            print(f"Reddit deadline reached — returning {len(rows)} partial results")
+
             break
 
-        # Calculate timestamps for the window
-        start_ts = now - (seconds_in_week * (i + 1))
-        end_ts = now - (seconds_in_week * i)
-        
-        # Build the Cloudsearch query
-        # syntax="cloudsearch" handles the timestamp:X..Y part
-        time_query = f"{query} timestamp:{start_ts}..{end_ts}"
-        
-        try:
-            # We use sort="top" to get the most significant posts from that week
-            # We use time_filter="all" so Reddit doesn't override our manual timestamps
-            search_results = reddit.subreddit("all").search(
-                time_query, 
-                sort="relevant", 
-                syntax="cloudsearch", 
-                time_filter="all", 
-                limit=limit
-            )
+        rows.append({
 
-            for post in search_results:
-                if deadline and time.time() > deadline:
-                    break
-                
-                rows.append({
-                    "id": post.id,
-                    "title": clean_text(post.title),
-                    "selftext": clean_text(post.selftext),
-                    "score": post.score,
-                    "num_comments": post.num_comments,
-                    "subreddit": str(post.subreddit),
-                    "created_utc": post.created_utc,
-                    "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
-                    "url": post.url,
-                    "permalink": f"https://www.reddit.com{post.permalink}",
-                    "comments_text": "",
-                })
-        except Exception as e:
-            print(f"Error fetching week {i}: {e}")
-            continue
+            "id": post.id,
+
+            "title": clean_text(post.title),
+
+            "selftext": clean_text(post.selftext),
+
+            "score": post.score,
+
+            "num_comments": post.num_comments,
+
+            "subreddit": str(post.subreddit),
+
+            "created_utc": post.created_utc,
+
+            "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
+
+            "url": post.url,
+
+            "permalink": f"https://www.reddit.com{post.permalink}",
+
+            "comments_text": "",
+
+        })
+
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+
+        df["full_text"] = (
+
+            df["title"] + "\n" + df["selftext"] + "\n" + df["comments_text"]
+
+        ).str.strip()
+
+    return df
 
     # Final Data Processing
     df = pd.DataFrame(rows)
