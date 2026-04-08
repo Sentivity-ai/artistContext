@@ -293,17 +293,19 @@ def compute_weekly_mentions(combined_df, artist_name) -> tuple[int, list[float]]
     last_35_df["days_from_start"] = (last_35_df["date"] - last_35_start).dt.days
     last_35_df["week_number"] = (last_35_df["days_from_start"] // 7) + 1
 
+    total_impact = int(last_35_df["num_comments"].sum())
+
+    # 2. Group by week and SUM the comments instead of .size()
     weekly = (
-        last_35_df.groupby("week_number")
-        .size()
+        last_35_df.groupby("week_number")["num_comments"]
+        .sum()  # This effectively "multiplies" the mention by its comment weight
         .reset_index(name="mentions")
     )
 
     all_weeks = pd.DataFrame({"week_number": [1, 2, 3, 4, 5]})
     weekly = all_weeks.merge(weekly, on="week_number", how="left").fillna(0)
-    weekly["mentions"] = weekly["mentions"].astype(float)
-
-    return total_mentions, weekly["mentions"].tolist()
+    
+    return total_impact, weekly["mentions"].tolist()
 
 # ─── Route ───────────────────────────────────────────────────────────────────
 
