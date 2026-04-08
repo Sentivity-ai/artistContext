@@ -117,35 +117,40 @@ def get_similar_subreddit(artist_name: str) -> Optional[str]:
 
 # ─── Data Collection ─────────────────────────────────────────────────────────
 
-# ─── Data Collection ─────────────────────────────────────────────────────────
-
 def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataFrame:
     import time
     rows = []
-    # We use sort="relevance" because "hot" often misses specific terms like "setlist" 
-    # or "merch" if they aren't trending at this exact second.
-    for post in reddit.subreddit("all").search(
-        query, sort="relevance", time_filter="month", limit=limit
-    ):
-        if deadline and time.time() > deadline:
-            print(f"Reddit deadline reached — returning {len(rows)} partial results")
-            break
-        rows.append({
-            "id": post.id,
-            "title": clean_text(post.title),
-            "selftext": clean_text(post.selftext),
-            "score": post.score,
-            "num_comments": post.num_comments,
-            "subreddit": str(post.subreddit),
-            "created_utc": post.created_utc,
-            "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
-            "url": post.url,
-            "permalink": f"https://www.reddit.com{post.permalink}",
-            "comments_text": "",
-        })
     
+    # We switch back to sort="hot" as requested, but keep the month filter
+    # "Hot" is more reliable for general discovery than "Relevance"
+    try:
+        search_iterator = reddit.subreddit("all").search(
+            query, sort="hot", time_filter="month", limit=limit
+        )
+        
+        for post in search_iterator:
+            if deadline and time.time() > deadline:
+                break
+                
+            rows.append({
+                "id": post.id,
+                "title": clean_text(post.title),
+                "selftext": clean_text(post.selftext),
+                "score": post.score,
+                "num_comments": post.num_comments,
+                "subreddit": str(post.subreddit),
+                "created_utc": post.created_utc,
+                "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
+                "url": post.url,
+                "permalink": f"https://www.reddit.com{post.permalink}",
+                "comments_text": "",
+            })
+    except Exception as e:
+        print(f"Search failed for query [{query}]: {e}")
+        
     df = pd.DataFrame(rows)
     if not df.empty:
+        # Use fillna to prevent the entire full_text from becoming NaN if body is empty
         df["full_text"] = (
             df["title"].fillna("") + "\n" + 
             df["selftext"].fillna("") + "\n" + 
@@ -153,40 +158,37 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
         ).str.strip()
     return df
 
-async def search_reddit_async(artist_name, limit=None, timeout=9.0):
+async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     import time
     deadline = time.time() + timeout
     
-    # Client's specific context order formulated for PRAW relevance
+    # We removed the complex boolean logic and quotes to make the search "fuzzier"
+    # This ensures Reddit actually finds matches even if phrasing is slightly off
     contexts = [
         "Tours", "Fan club", "Songs", "Sold out", "Albums", 
         "Setlist", "Merch", "Festival", "Meet and greet", 
         "Encore", "Pre-save", "Outfit planning", "Radio"
     ]
     
-    # Create individual search tasks for each context
+    # Create tasks: search for [Artist Name Context]
     tasks = [
         asyncio.to_thread(
-            search_reddit, f'"{artist_name}" {ctx}', limit=limit, deadline=deadline
+            search_reddit, f"{artist_name} {ctx}", limit=limit, deadline=deadline
         )
         for ctx in contexts
     ]
     
-    # Run all 13 searches in parallel
     results = await asyncio.gather(*tasks)
     
-    # Filter out empty DataFrames to avoid concat errors
-    valid_results = [res for res in results if not res.empty]
+    # Filter out empty results before merging
+    valid_dfs = [df for df in results if not df.empty]
     
-    if not valid_results:
-        # Return an empty DF with correct columns if nothing is found
-        return pd.DataFrame(columns=[
-            "id", "title", "selftext", "score", "num_comments", "subreddit",
-            "created_utc", "created_dt", "url", "permalink", "comments_text", "full_text"
-        ])
+    if not valid_dfs:
+        return pd.DataFrame()
     
-    # Combine and deduplicate (same post might match multiple contexts)
-    combined_df = pd.concat(valid_results, ignore_index=True).drop_duplicates(subset=["id"])
+    # Combine everything and drop duplicates (essential for multi-query)
+    combined_df = pd.concat(valid_dfs, ignore_index=True)
+    combined_df = combined_df.drop_duplicates(subset=["id"])
     
     return combined_df
 
