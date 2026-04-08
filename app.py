@@ -147,7 +147,7 @@ POPJUSTICE_HEADERS = {
     "Referer": "https://forum.popjustice.com/",
 }
 
-async def scrape_popjustice(session, artist_name, max_results=50):
+async def scrape_popjustice(session, artist_name, max_results=None):
     source = "Popjustice"
     q = quote_plus(artist_name)
     search_url = (
