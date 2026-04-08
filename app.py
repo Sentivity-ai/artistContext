@@ -109,60 +109,63 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
     import time
     rows = []
     
-    # Configuration for the rolling window
     num_weeks = 5
     seconds_in_week = 7 * 24 * 60 * 60
     now = int(time.time())
 
     for i in range(num_weeks):
-        # Calculate start and end for this specific week chunk
-        start_ts = now - (seconds_in_week * (i + 1))
-        end_ts = now - (seconds_in_week * i)
-        
-        # Cloudsearch range syntax: "keyword timestamp:start..end"
-        time_query = f"{query} timestamp:{start_ts}..{end_ts}"
-        
-        # Perform the search for this chunk
-        # We use syntax="cloudsearch" and time_filter="all" because 
-        # the timestamp filter handles the timing manually.
-        search_results = reddit.subreddit("all").search(
-            hist_query, 
-            sort="top", # Use 'top' or 'relevance' for historical data
-            syntax="cloudsearch", 
-            time_filter="all", 
-            limit=limit
-        )
-
-        for post in search_results:
-            # Respect the global deadline across all week loops
-            if deadline and time.time() > deadline:
-                print(f"Reddit deadline reached during week {i+1} — returning {len(rows)} results")
-                break
-            
-            rows.append({
-                "id": post.id,
-                "title": clean_text(post.title),
-                "selftext": clean_text(post.selftext),
-                "score": post.score,
-                "num_comments": post.num_comments,
-                "subreddit": str(post.subreddit),
-                "created_utc": post.created_utc,
-                "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
-                "url": post.url,
-                "permalink": f"https://www.reddit.com{post.permalink}",
-                "comments_text": "",
-            })
-        
-        # If we broke the inner loop due to deadline, break the outer loop too
+        # Stop everything if we are out of time
         if deadline and time.time() > deadline:
             break
 
-    # Build the DataFrame
+        # Calculate timestamps for the window
+        start_ts = now - (seconds_in_week * (i + 1))
+        end_ts = now - (seconds_in_week * i)
+        
+        # Build the Cloudsearch query
+        # syntax="cloudsearch" handles the timestamp:X..Y part
+        time_query = f"{query} timestamp:{start_ts}..{end_ts}"
+        
+        try:
+            # We use sort="top" to get the most significant posts from that week
+            # We use time_filter="all" so Reddit doesn't override our manual timestamps
+            search_results = reddit.subreddit("all").search(
+                time_query, 
+                sort="top", 
+                syntax="cloudsearch", 
+                time_filter="all", 
+                limit=limit
+            )
+
+            for post in search_results:
+                if deadline and time.time() > deadline:
+                    break
+                
+                rows.append({
+                    "id": post.id,
+                    "title": clean_text(post.title),
+                    "selftext": clean_text(post.selftext),
+                    "score": post.score,
+                    "num_comments": post.num_comments,
+                    "subreddit": str(post.subreddit),
+                    "created_utc": post.created_utc,
+                    "created_dt": datetime.fromtimestamp(post.created_utc, tz=timezone.utc),
+                    "url": post.url,
+                    "permalink": f"https://www.reddit.com{post.permalink}",
+                    "comments_text": "",
+                })
+        except Exception as e:
+            print(f"Error fetching week {i}: {e}")
+            continue
+
+    # Final Data Processing
     df = pd.DataFrame(rows)
     
-    # Deduplicate in case a post falls on a boundary or appears twice
     if not df.empty:
+        # 1. Deduplicate (crucial when doing multiple searches)
         df = df.drop_duplicates(subset=["id"])
+        
+        # 2. Re-create the full_text column for sentiment/analysis
         df["full_text"] = (
             df["title"].fillna("") + "\n" + 
             df["selftext"].fillna("") + "\n" + 
@@ -170,7 +173,6 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
         ).str.strip()
         
     return df
-
 async def search_reddit_async(query, limit=None, timeout=9.0):
     import time
     deadline = time.time() + timeout
