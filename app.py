@@ -165,13 +165,24 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     # We removed the complex boolean logic and quotes to make the search "fuzzier"
     # This ensures Reddit actually finds matches even if phrasing is slightly off
     contexts = [
-        "music",
+        "",
     ]
+
+    # Check word count
+    words = artist_name.split()
+    
+    # Logic: if > 2 words, turn "65 north street" into "65northstreet band"
+    # Otherwise, keep it as the original name
+    if len(words) > 2:
+        search_term = f"{''.join(words)} band"
+    else:
+        search_term = artist_name
     
     # Create tasks: search for [Artist Name Context]
+    # Now we use 'search_term' for the queries
     tasks = [
         asyncio.to_thread(
-            search_reddit, f"{artist_name} {ctx}", limit=limit, deadline=deadline
+            search_reddit, f"{search_term} {ctx}", limit=limit, deadline=deadline
         )
         for ctx in contexts
     ]
