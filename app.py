@@ -167,11 +167,13 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     contexts = [
         "",
     ]
+
+    extra_label = "band/musical group" if len(artist_name.split()) > 2 else ""
     
     # Create tasks: search for [Artist Name Context]
     tasks = [
         asyncio.to_thread(
-            search_reddit, f"{artist_name} {ctx}", limit=limit, deadline=deadline
+            search_reddit, f"{artist_name} {extra_label} {ctx}", limit=limit, deadline=deadline
         )
         for ctx in contexts
     ]
