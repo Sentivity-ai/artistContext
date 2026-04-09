@@ -165,15 +165,13 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     # We removed the complex boolean logic and quotes to make the search "fuzzier"
     # This ensures Reddit actually finds matches even if phrasing is slightly off
     contexts = [
-        "",
+        "music",
     ]
-
-    extra_label = "band/musical group" if len(artist_name.split()) > 2 else ""
     
     # Create tasks: search for [Artist Name Context]
     tasks = [
         asyncio.to_thread(
-            search_reddit, f"{artist_name} {extra_label} {ctx}", limit=limit, deadline=deadline
+            search_reddit, f"{artist_name} {ctx}", limit=limit, deadline=deadline
         )
         for ctx in contexts
     ]
@@ -189,6 +187,21 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     # Combine everything and drop duplicates (essential for multi-query)
     combined_df = pd.concat(valid_dfs, ignore_index=True)
     combined_df = combined_df.drop_duplicates(subset=["id"])
+
+    # # ─── New Filtering Logic ───
+    # # Split "Luke Combs" into ["Luke", "Combs"]
+    # name_parts = artist_name.lower().split()
+    
+    # def contains_artist(text):
+    #     if not text: return False
+    #     text_lower = text.lower()
+    #     # Returns True if any part of the name (Luke OR Combs) exists in the text
+    #     return any(part in text_lower for part in name_parts)
+
+    # # Apply the filter to ensure relevance
+    # combined_df = combined_df[combined_df["full_text"].apply(contains_artist)].copy()
+    
+    return combined_df
 
     # # ─── New Filtering Logic ───
     # # Split "Luke Combs" into ["Luke", "Combs"]
