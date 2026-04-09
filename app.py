@@ -340,7 +340,7 @@ def compute_weekly_mentions(combined_df, artist_name) -> tuple[int, list[float]]
 def map_artist():
     data = request.get_json(force=True)
     artist = (data.get("artist") or "").strip()
-    context = (data.get("context") or "").strip()
+    context = "music"
 
     if not artist:
         return jsonify({"error": "Missing required field: artist"}), 400
@@ -385,9 +385,9 @@ def map_artist():
     })
 
 
-@app.route("/map/<artist_name>", methods=["GET"])
+@app.route("/map/<artist_name>", defaults={"context": "music"}, methods=["GET"])
 @app.route("/map/<artist_name>/<context>", methods=["GET"])
-def map_artist_get(artist_name, context="songs"):
+def map_artist_get(artist_name, context="music"):
     from flask import request as flask_request
     # Reuse the same logic by faking a POST body
     flask_request.environ["REQUEST_METHOD"] = "GET"
