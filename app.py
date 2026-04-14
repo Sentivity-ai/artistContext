@@ -177,7 +177,7 @@ async def search_reddit_async(artist_name, limit=None, timeout=10.0):
     #     search_term = f"{''.join(words)} band"
     # else:
     #     search_term = artist_name
-    search_term=artist_name
+    search_term=f'"{artist_name}"'
     
     # Create tasks: search for [Artist Name Context]
     # Now we use 'search_term' for the queries
