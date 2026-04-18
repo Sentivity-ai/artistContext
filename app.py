@@ -169,26 +169,15 @@ async def search_reddit_async(artist_name,context="music", limit=None, timeout=1
     else:
         search_term = f'"{artist_name}"'
     
-    # Create tasks: search for [Artist Name Context]
-    # Now we use 'search_term' for the queries
-    tasks = [
-        asyncio.to_thread(
-            search_reddit, f"{search_term} {ctx}", limit=limit, deadline=deadline
-        )
-        for ctx in contexts
-    ]
+    # Just run the single search query you built
+    df = await asyncio.to_thread(
+        search_reddit, search_term, limit=limit, deadline=deadline
+    )
     
-    results = await asyncio.gather(*tasks)
-    
-    # Filter out empty results before merging
-    valid_dfs = [df for df in results if not df.empty]
-    
-    if not valid_dfs:
+    if df.empty:
         return pd.DataFrame()
     
-    # Combine everything and drop duplicates (essential for multi-query)
-    combined_df = pd.concat(valid_dfs, ignore_index=True)
-    combined_df = combined_df.drop_duplicates(subset=["id"])
+    combined_df = df.drop_duplicates(subset=["id"])
 
     # # ─── New Filtering Logic ───
     # # Split "Luke Combs" into ["Luke", "Combs"]
@@ -274,7 +263,7 @@ async def scrape_popjustice(session, artist_name, max_results=None):
 async def collect_mentions_async(artist_name, context, limit=None):
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(
-            search_reddit_async(reddit_query, context, limit=limit),
+            search_reddit_async(artist_name, context, limit=limit),
             scrape_popjustice(session, artist_name),
             return_exceptions=True,
         )
