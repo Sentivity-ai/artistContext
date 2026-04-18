@@ -392,7 +392,10 @@ def map_artist_get(artist_name, context="music"):
     # Reuse the same logic by faking a POST body
     flask_request.environ["REQUEST_METHOD"] = "GET"
     artist = artist_name.strip()
-    reddit_query = artist
+    if context:
+        reddit_query = f"{artist} {context.strip()}"
+    else:
+        reddit_query = artist
 
     try:
         source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=None))
