@@ -158,26 +158,16 @@ def search_reddit(query: str, *, limit=None, deadline: float = None) -> pd.DataF
         ).str.strip()
     return df
 
-async def search_reddit_async(artist_name, limit=None, timeout=10.0):
+async def search_reddit_async(artist_name,context="music", limit=None, timeout=10.0):
     import time
     deadline = time.time() + timeout
     
-    # We removed the complex boolean logic and quotes to make the search "fuzzier"
-    # This ensures Reddit actually finds matches even if phrasing is slightly off
-    contexts = [
-        "",
-    ]
-
-    # Check word count
-    # words = artist_name.split()
-    
-    # # Logic: if > 2 words, turn "65 north street" into "65northstreet band"
-    # # Otherwise, keep it as the original name
-    # if len(words) >= 2:
-    #     search_term = f"{''.join(words)} band"
-    # else:
-    #     search_term = artist_name
-    search_term=f'"{artist_name}"'
+    if context:
+        # Result: "Ed Sheeran" music
+        # This forces the artist name to be exact, but allows 'music' to be anywhere
+        search_term = f'"{artist_name}" {context}' 
+    else:
+        search_term = f'"{artist_name}"'
     
     # Create tasks: search for [Artist Name Context]
     # Now we use 'search_term' for the queries
@@ -281,10 +271,10 @@ async def scrape_popjustice(session, artist_name, max_results=None):
         print(f"Popjustice scrape failed: {repr(e)}")
     return build_df_from_rows(rows)
 
-async def collect_mentions_async(artist_name, reddit_query, limit=None):
+async def collect_mentions_async(artist_name, context, limit=None):
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(
-            search_reddit_async(reddit_query, limit=limit),
+            search_reddit_async(reddit_query, context, limit=limit),
             scrape_popjustice(session, artist_name),
             return_exceptions=True,
         )
@@ -392,16 +382,14 @@ def map_artist_get(artist_name, context="music"):
     # Reuse the same logic by faking a POST body
     flask_request.environ["REQUEST_METHOD"] = "GET"
     artist = artist_name.strip()
-    if context:
-        reddit_query = f"{artist} {context.strip()}"
-    else:
-        reddit_query = artist
+    ctx = context.strip()
 
     try:
-        source_dfs = asyncio.run(collect_mentions_async(artist, reddit_query, limit=None))
+        # No more messy string concatenation here!
+        source_dfs = asyncio.run(collect_mentions_async(artist, ctx, limit=None))
     except RuntimeError:
         loop = asyncio.new_event_loop()
-        source_dfs = loop.run_until_complete(collect_mentions_async(artist, reddit_query, limit=None))
+        source_dfs = loop.run_until_complete(collect_mentions_async(artist, ctx, limit=None))
         loop.close()
 
     all_dfs = []
